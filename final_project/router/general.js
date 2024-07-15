@@ -1,103 +1,95 @@
 const express = require('express');
-const books = require("./booksdb.js");
-const { isValid, users } = require("./auth_users.js");
-const public_users = express.Router();
-const axios = require('axios');
-const { readUsers, writeUsers } = require('./userStorage');
+const jwt = require('jsonwebtoken');
+const session = require('express-session');
+const bodyParser = require('body-parser');
+const customer_routes = require('./router/auth_users.js').authenticated;
+const genl_routes = require('./router/general.js').general;
+const { v4: uuidv4 } = require('uuid');
 
-// Route to register a new user
-public_users.post("/register", (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ message: "Username and password are required" });
-  }
-  if (isValid(username)) {
-    return res.status(409).json({ message: "Username already exists" });
-  }
-  // Add new user 
-  users.push({ username, password });
-  writeUsers(users);
-  res.status(201).json({ message: "User registered successfully" });
-});
+require('dotenv').config();
 
-// Get the book list available in the shop
-public_users.get('/', function (req, res) {
-  try {
-    res.status(200).json(books); 
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
+const app = express();
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY || 'your_default_jwt_secret_key';
 
-// Get book details based on ISBN
-public_users.get('/isbn/:isbn', function (req, res) {
-  const { isbn } = req.params;
-  if (!isbn || !books[isbn]) {
-    return res.status(404).json({ message: "Book not found" });
-  }
-  try {
-    res.status(200).json(books[isbn]);
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-  
-// Get book details based on author
-public_users.get('/author/:author', function (req, res) {
-  const { author } = req.params;
-  const booksByAuthor = [];
-  for (const isbn in books) {
-    if (books.hasOwnProperty(isbn)) {
-      if (books[isbn].author === author) {
-        booksByAuthor.push(books[isbn]);
-      }
+let reviews = {};
+
+// Middleware to parse JSON bodies
+app.use(express.json());
+app.use(bodyParser.json());
+
+// Session middleware setup
+app.use(session({
+    secret: 'fingerprint_customer', // Session secret for /customer routes
+    resave: true,
+    saveUninitialized: true,
+    cookie: { secure: false } // Set secure to true if using HTTPS
+}));
+
+// JWT token verification middleware
+const verifyToken = (req, res, next) => {
+    const token = req.headers.authorization || req.session.token; // Check header or session
+
+    if (!token) {
+        return res.status(401).json({ message: "Access denied. No token provided." });
     }
-  }
-  try {
-    if (booksByAuthor.length === 0) {
-      res.status(404).json({ message: "No books found for this author" });
+
+    jwt.verify(token, JWT_SECRET_KEY, (err, decoded) => {
+        if (err) {
+            return res.status(400).json({ message: "Invalid token." });
+        } else {
+            req.user = decoded;
+            next();
+        }
+    });
+};
+
+// Route for adding/modifying a review
+app.post('/auth/review/:isbn', verifyToken, (req, res) => {
+    const isbn = req.params.isbn;
+    const { review } = req.body;
+    const username = req.user.username; // Extract username from decoded token
+
+    {
+
+        if (!reviews[isbn]) {
+            reviews[isbn] = {};
+        }
+
+    }
+
+    
+
+    if (reviews[isbn][username]) {
+        reviews[isbn][username].review = review;
+        res.json({ message: `Review modified for ISBN ${isbn}` });
     } else {
-      res.status(200).json(booksByAuthor);
+        const reviewId = uuidv4();
+        reviews[isbn][username] = { reviewId, review };
+        res.json({ message: `Review added for ISBN ${isbn}` });
     }
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-  }
 });
 
-// Get all books based on title
-public_users.get('/title/:title', function (req, res) {
-  const { title } = req.params;
-  const booksByTitle = [];
-  for (const isbn in books) {
-    if (books.hasOwnProperty(isbn)) {
-      if (books[isbn].title.toLowerCase().includes(title.toLowerCase())) {
-        booksByTitle.push(books[isbn]);
-      }
+// Route to retrieve all reviews for a given ISBN
+app.get('/reviews/:isbn', (req, res) => {
+    const isbn = req.params.isbn;
+
+    if (!reviews[isbn]) {
+        return res.status(404).json({ error: 'No reviews found for this ISBN' });
     }
-  }
-  try {
-    if (booksByTitle.length === 0) {
-      res.status(404).json({ message: "No books found for this title" });
-    } else {
-      res.status(200).json(booksByTitle);
-    }
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-  }
+
+    const reviewsList = Object.values(reviews[isbn]); // Get array of reviews
+    res.json({ reviews: reviewsList });
 });
 
-// Get book reviews based on ISBN
-public_users.get('/review/:isbn', function (req, res) {
-  const { isbn } = req.params;
-  if (!isbn || !books[isbn]) {
-    return res.status(404).json({ message: "Book not found" });
-  }
-  try {
-    const reviews = books[isbn].reviews || {};
-    res.status(200).json({ reviews });
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-  }
+// Routes
+app.use("/customer", customer_routes); // Mounted under /customer
+app.use("/", genl_routes); // General routes
+A
+// Default route
+app.get('/', (req, res) => {
+    res.send('Server is running!');
 });
 
-module.exports.general = public_users;
+// Start server
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
