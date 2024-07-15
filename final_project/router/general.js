@@ -14,7 +14,7 @@ public_users.post("/register", (req, res) => {
   if (isValid(username)) {
     return res.status(409).json({ message: "Username already exists" });
   }
-  // Add new user
+  // Add new user 
   users.push({ username, password });
   writeUsers(users);
   res.status(201).json({ message: "User registered successfully" });
@@ -23,7 +23,7 @@ public_users.post("/register", (req, res) => {
 // Get the book list available in the shop
 public_users.get('/', function (req, res) {
   try {
-    res.status(200).json(books); // Assuming `books` is correctly structured as an object
+    res.status(200).json(books); 
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" });
   }
