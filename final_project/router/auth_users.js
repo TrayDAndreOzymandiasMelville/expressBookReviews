@@ -39,7 +39,7 @@ regd_users.post("/login", (req, res) => {
 regd_users.put("/auth/review/:isbn", (req, res) => {
   const { isbn } = req.params;
   const { review } = req.body;
-  const username = req.session.user; // Assuming session middleware is used for authentication
+  const username = req.session.user; 
 
   if (!isbn || !books[isbn]) {
     return res.status(404).json({ message: "Book not found" });
@@ -65,7 +65,7 @@ regd_users.put("/auth/review/:isbn", (req, res) => {
 // Endpoint to delete a book review
 regd_users.delete("/auth/review/:isbn", (req, res) => {
   const { isbn } = req.params;
-  const username = req.session.user; // Assuming session middleware is used for authentication
+  const username = req.session.user; 
 
   if (!isbn || !books[isbn]) {
     return res.status(404).json({ message: "Book not found" });
